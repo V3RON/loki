@@ -1,9 +1,9 @@
 /* eslint-disable import/no-extraneous-dependencies, import/no-unresolved, global-require */
 
-const storybook = require('@storybook/react-native');
-const addons = require('@storybook/addons').default;
+const { addons } = require('@storybook/preview-api');
 const ReactNative = require('react-native');
 const ExceptionsManager = require('react-native/Libraries/Core/ExceptionsManager');
+const HMRClient = require('react-native/Libraries/Utilities/HMRClient');
 const readyStateManager = require('./ready-state-manager');
 
 const { awaitReady, resetPendingPromises } = readyStateManager;
@@ -115,12 +115,13 @@ async function configureStorybook() {
 
   const restore = () => {
     if ('loki' in global) {
-      global.loki.isRunning = true;
+      global.loki.isRunning = false;
     }
 
     customErrorHandler = null;
     ReactNative.StatusBar.setHidden(originalState.statusBarHidden);
     ReactNative.LogBox.ignoreAllLogs(false);
+    HMRClient.enable();
   };
 
   const prepare = () => {
@@ -144,9 +145,8 @@ async function configureStorybook() {
         }
       }
     };
-    if (hasDevSettings) {
-      DevSettings.setHotLoadingEnabled(false);
-    }
+
+    HMRClient.disable();
     ReactNative.StatusBar.setHidden(true, 'none');
     ReactNative.LogBox.ignoreAllLogs(true);
   };
@@ -161,9 +161,9 @@ async function configureStorybook() {
     emit('didRestore');
   });
 
-  on('getStories', () => {
-    const stories = storybook
-      .raw()
+  on('getStories', async () => {
+    const extractedStories = Object.values(await __STORYBOOK_PREVIEW__.extract());
+    const stories = extractedStories
       .map((component) => ({
         id: component.id,
         kind: component.kind,
